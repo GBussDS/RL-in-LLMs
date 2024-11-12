@@ -1,5 +1,6 @@
 from ollama import Client
 from programmer import programmer
+import ast
 
 client = Client(host='http://localhost:11434')
 
@@ -35,7 +36,7 @@ class reviewer():
 
         self.prompt_history.append(self.current_prompt)
 
-    def code(self, code):
+    def review(self, code):
         self._set_current_prompt(code)
        
         attempts = 0
@@ -49,11 +50,19 @@ class reviewer():
             ])
             attempts += 1
 
-        review = response['message']['content']
+        review, score = self._extract_score(response['message']['content'])
 
         self.review_history.append(review)
 
-        return review
+        return review, score
+    
+    def _extract_score(self, text):
+        lines = text.strip().split('\n')
+        last_line = lines[-1]
+
+        score = ast.literal_eval(last_line)
+        
+        return score
 
 if __name__ == '__main__':
     
@@ -65,7 +74,7 @@ if __name__ == '__main__':
                      You may assume that each input would have exactly one solution,\
                      and you may not use the same element twice. You can return the answer in any order.')
 
-    review = reviewer.code(code)
+    review = reviewer.review(code)
     
     print(review)
 
