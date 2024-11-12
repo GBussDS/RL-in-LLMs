@@ -13,7 +13,7 @@ class reviewer():
             "including code clarity, readability, efficiency, and optimization, also check for proper use of imports and adherence to best practices. "
             "Your feedback should be detailed and strict, addressing potential improvements, and noting any issues with syntax, style, or logic. "
             "You must give the code a score from 1 to 100 in all the critical aspects previously mentioned. Be strict when scoring."
-            " At the VERY END of your response, you MUST add ONLY the scores in this exact format:\n"
+            " At the VERY END of your response, in the LAST line, you MUST add ONLY the scores in this exact format:\n"
             "{'Total':score, 'clarity':score, 'readability':score, 'efficiency':score, 'optimization':score}\n"
             "No additional text, explanations, or commentary should appear after this line, as it will not be considered. Do not write anything after the scores.")
 
@@ -66,7 +66,7 @@ class reviewer():
         lines = text.strip().split('\n')
         last_line = lines[-1]
         score_text = re.search(r"\{.*\}", last_line).group()
-        
+
         score = ast.literal_eval(score_text)
 
         review = '\n'.join(lines[:-1])

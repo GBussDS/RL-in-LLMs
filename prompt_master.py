@@ -10,24 +10,25 @@ class promptMaster():
 
     def __init__(self):
         self.prompt = ("\nPay close attention to the first word of this prompt, as it will dictate your role and approach. If the prompt starts with 'CODE', "
-               "you are guiding the programmer. If it starts with 'REVIEW', you are guiding the reviewer. Act according to the first word and follow the specific instructions below."
+                "you are guiding the programmer. If it starts with 'REVIEW', you are guiding the reviewer. Act according to the first word and follow the specific instructions below."
 
-               "\n\nCODE: You are an expert prompt master responsible for guiding a programmer through iterative code improvement based on reviewer feedback. "
-               "You will receive both the programmer's initial code and the reviewer's feedback, and your task is to generate a specific hint that "
-               "will help the programmer enhance clarity, readability, efficiency, or optimization of their code. Your hint should be actionable, clear, "
-               "and directly address the areas identified in the review. This hint will then be provided to the programmer with the assigned weights in the following format "
-               "to indicate how much emphasis the programmer should place on each aspect in the next iteration:\n"
-               "{'clarity': weight, 'readability': weight, 'efficiency': weight, 'optimization': weight}. "
-               "This MUST appear at the end of your response, with NOTHING following it."
+                "\n\nCODE: You are an expert prompt master responsible for providing a general, long-lasting hint that will help the programmer iteratively improve their code, "
+                "focusing on overall quality enhancements that will remain relevant across different versions and types of code. The hint should not reference any specific code content "
+                "but should offer guidance that could improve clarity, readability, efficiency, or optimization. Provide only the hint and an emphasis score, which is a single number "
+                "from 1 to 100, indicating how strongly the hint should be followed. Include the hint, the emphasis score, and the weights for each area in the following format, and "
+                "ensure that NOTHING follows this format (make sure to write between <>):\n"
+                "Hint: <Your hint here>\n"
+                "Emphasis: <1-100>\n"
+                "{'clarity': weight, 'readability': weight, 'efficiency': weight, 'optimization': weight}"
 
-               "\n\nREVIEW: You are an expert prompt master responsible for guiding a reviewer to deliver precise and constructive feedback on a programmer's code. "
-               "You will receive the programmer's updated code and the reviewer's latest feedback. Your task is to analyze the effectiveness of the last hint provided "
-               "to the programmer and assess the reviewer's feedback quality. Based on this analysis, generate a hint that will help the reviewer focus on areas that need "
-               "greater attention or detail, such as clarity, readability, efficiency, or optimization, in the next round of review. Your goal is to improve the reviewer's "
-               "ability to deliver actionable, balanced feedback. Once you've provided the hint, assign weights in the following format that will guide the reviewer's focus on "
-               "each aspect, influencing the weighted mean for the review's overall score:\n"
-               "{'clarity': weight, 'readability': weight, 'efficiency': weight, 'optimization': weight}. "
-               "This MUST appear at the end of your response, with NOTHING following it (This is of utmost importance).")
+                "\n\nREVIEW: You are an expert prompt master responsible for providing a general, long-lasting hint that will help the reviewer improve their feedback. "
+                "Your hint should be applicable to multiple rounds of review and focus on enhancing clarity, readability, efficiency, or optimization in their feedback, "
+                "without referencing any specific feedback or code instance. Provide only the hint and an emphasis score, which is a single number from 1 to 100, indicating how strongly "
+                "the hint should be prioritized in their next review. Include the hint, the emphasis score, and the weights in the following format, ensuring NOTHING follows this format:\n"
+                "Hint: <Your hint here>\n"
+                "Emphasis: <1-100>\n"
+                "{'clarity': weight, 'readability': weight, 'efficiency': weight, 'optimization': weight}")
+
 
         self.current_prompt = ""
 
@@ -75,21 +76,21 @@ class promptMaster():
             ])
             attempts += 1
 
-        hint, weights = self._extract_weight(response['message']['content'])
+        hint, hint_strenght, weights = self._extract_info(response['message']['content'])
 
-        return hint, weights
+        return hint, hint_strenght, weights
     
-    def _extract_weight(self, text):
+    def _extract_info(self, text):
         lines = text.strip().split('\n')
 
-        last_line = lines[-1]
-        weights_text = re.search(r"\{.*\}", last_line).group()
-
+        weights_text = re.search(r"\{.*\}", lines[-1]).group()
         weights = ast.literal_eval(weights_text)
 
-        hint = '\n'.join(lines[:-1])
+        hint_text = "\n".join(lines[:-2])
+        hint = re.search(r"<(.*?)>", hint_text).group(1)
+        hint_strength = re.search(r"<(.*?)>", lines[-2]).group(1)
         
-        return hint, weights
+        return hint, hint_strength, weights
 
 if __name__ == '__main__':
     
@@ -104,7 +105,7 @@ if __name__ == '__main__':
 
     review, score = reviewer.review(code)
 
-    hint, new_weight = promptMaster.create_hint('CODE', code, review, score, programmer.weights)
+    hint, hint_stren, new_weight = promptMaster.create_hint('CODE', code, review, score, programmer.weights)
     
     print(hint)
     print(new_weight)
