@@ -5,10 +5,10 @@ client = Client(host='http://localhost:11434')
 class programmer():
 
     def __init__(self):
-        self.prompt = ("You are a skilled programmer. Write only the code, without any additional text, language label, headers, or explanations. "
+        self.prompt = ("You are a skilled programmer. Write only the code, without any additional text, "
+               "language labels, headers, or explanations, but you may add comments in the code for readability."
                "The code should include all necessary imports and should be executable as-is. If creating a function, provide an example of its usage at the end."
-               "    When writing the code take the following hints in cosideration, they all have a weight "
-               "from 1 to a 100, that is how strongly you should take them in consideration when writing the code. The hints are:")
+               "Please take the following hints into consideration, each with a weight from 1 to 100, indicating their importance. The hints are:")
         self.current_prompt = ""
         self.hints = ""
         self.prompt_history = []
@@ -46,8 +46,9 @@ class programmer():
         return code
 
 if __name__ == '__main__':
-    #Test
+
     programmer = programmer()
+    
     code = programmer.code('Given an array of integers nums and an integer target,\
                      return indices of the two numbers such that they add up to target.\
                      You may assume that each input would have exactly one solution,\
