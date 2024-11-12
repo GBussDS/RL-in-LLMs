@@ -7,21 +7,23 @@ class programmer():
     def __init__(self):
         self.prompt = ("You are a skilled programmer. Write only the code, without any additional text, "
                "language labels, headers, or explanations, but you may add comments in the code for readability."
-               "The code should include all necessary imports and should be executable as-is. If creating a function, provide an example of its usage at the end."
-               "Please take the following hints into consideration, each with a weight from 1 to 100, indicating their importance. The hints are:")
+               "The code should include all necessary imports and should be executable as-is. If creating a function, provide an example of its usage at the end.")
         self.current_prompt = ""
         self.hints = ""
         self.prompt_history = []
         self.code_history = []
         self.reward_history = []
         self.max_attempts = 10
+        self.weights = {'clarity':1, 'readability':1, 'efficiency':1, 'optimization':1}
 
     def add_hint(self, new_hint, hint_weight):
         self.hints += "\n" + "- " + str(new_hint) + f"(Weight: {hint_weight})"
         
     def _set_current_prompt(self, question):
-        self.current_prompt = self.prompt + self.hints
-        self.current_prompt += "\n Now, following all the previous rules, write a code to answer the question:\n"
+        self.current_prompt = self.prompt + "\n When writing the code you should take the following weights in consideration, as to what you should focus more:\n"
+        self.current_prompt += str(self.weights)
+        self.current_prompt += "\nPlease take the following hints into consideration, each with a weight from 1 to 100, indicating their importance. The hints are:" + self.hints
+        self.current_prompt += "\nNow, following all the previous rules, write a code to answer the question:\n"
         self.current_prompt += question
         self.prompt_history.append(self.current_prompt)
 
@@ -56,6 +58,7 @@ if __name__ == '__main__':
     
     print(code)
 
+    print(programmer.current_prompt)
 
 
 
