@@ -1,19 +1,22 @@
 from ollama import Client
 from programmer import programmer
 import ast
+import re
 
 client = Client(host='http://localhost:11434')
 
 class reviewer():
 
     def __init__(self):
-        self.prompt = ("You are an expert code reviewer tasked with performing a comprehensive review. Your review should cover all critical aspects, "
-            "including code clarity, readability, efficiency and optimization, also check for proper use of imports and adherence to best practices. "
+        self.prompt = (
+            "You are an expert code reviewer tasked with performing a comprehensive review. Your review should cover all critical aspects, "
+            "including code clarity, readability, efficiency, and optimization, also check for proper use of imports and adherence to best practices. "
             "Your feedback should be detailed and strict, addressing potential improvements, and noting any issues with syntax, style, or logic. "
-            "You must give the code a score from 1 to 100, in all the critical aspects previously mentioned, be strict when scoring."
-            " In the END of your response add in this format the scores you came up:\n"
-            "{'Total':score, 'clarity':score, 'readability':score, 'efficiency':score, 'optimization':score}"
-            " This MUST be in the end of the response, and NOTHING must be after it.")
+            "You must give the code a score from 1 to 100 in all the critical aspects previously mentioned. Be strict when scoring."
+            " At the VERY END of your response, you MUST add ONLY the scores in this exact format:\n"
+            "{'Total':score, 'clarity':score, 'readability':score, 'efficiency':score, 'optimization':score}\n"
+            "No additional text, explanations, or commentary should appear after this line, as it will not be considered. Do not write anything after the scores.")
+
         
         self.current_prompt = ""
         self.hints = ""
@@ -29,8 +32,11 @@ class reviewer():
     def _set_current_prompt(self, code):
         self.current_prompt = self.prompt + "\n The total score must be a weighted average of the other taking the following weights:"
         self.current_prompt += str(self.weights)
-        self.current_prompt += "Please take the following hints into consideration, each with a weight from 1 to 100, indicating their importance. The hints are:"
-        self.current_prompt += self.hints
+        
+        if self.hints != "":
+            self.current_prompt += "Please take the following hints into consideration, each with a weight from 1 to 100, indicating their importance. The hints are:"
+            self.current_prompt += self.hints
+        
         self.current_prompt += "\n Now, following all the previous rules, review the code:\n"
         self.current_prompt += code
 
@@ -59,8 +65,9 @@ class reviewer():
     def _extract_score(self, text):
         lines = text.strip().split('\n')
         last_line = lines[-1]
-
-        score = ast.literal_eval(last_line)
+        score_text = re.search(r"\{.*\}", last_line).group()
+        
+        score = ast.literal_eval(score_text)
 
         review = '\n'.join(lines[:-1])
         
