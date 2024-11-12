@@ -61,8 +61,10 @@ class reviewer():
         last_line = lines[-1]
 
         score = ast.literal_eval(last_line)
+
+        review = '\n'.join(lines[:-1])
         
-        return score
+        return review, score
 
 if __name__ == '__main__':
     
