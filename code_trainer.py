@@ -21,8 +21,8 @@ class CodeTrainer():
             review, score = self.reviewer.review(code)
             
             review_hint, review_hint_stren, new_review_weight = self.promptMaster.create_hint('REVIEW', code, review, score, self.reviewer.weights)
-
-            self.programmer.update(review_hint, review_hint_stren, new_review_weight)
+            
+            self.reviewer.update(review_hint, review_hint_stren, new_review_weight)
 
             print(score)
 
@@ -30,7 +30,7 @@ class CodeTrainer():
         code = self.programmer.code(question)
         review, score = self.reviewer.review(code)
 
-        print(f"With the score of {score} the code written was:\n\n{code}")
+        (f"With the score of {score} the code written was:\n\n{code}")
 
 if __name__ == '__main__':
     
