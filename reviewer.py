@@ -90,11 +90,11 @@ class Reviewer():
     
     def _store_hints(self):
         text = str(self.weights) + self.hints
-        with open("data/programmer_hints.txt", "w") as file:
+        with open("data/reviewer_hints.txt", "w") as file:
             file.write(text)
     
     def _get_hints(self):
-        with open("data/programmer_hints.txt", "r") as file:
+        with open("data/reviewer_hints.txt", "r") as file:
             lines = file.readline()
         
         if len(lines) > 0:
