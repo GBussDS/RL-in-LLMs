@@ -17,8 +17,14 @@ class Programmer():
         self.weights = {'clarity':1, 'readability':1, 'efficiency':1, 'optimization':1}
 
     def update(self, new_hint, hint_weight, weights):
-        self.hints += "\n" + "- " + str(new_hint) + f"(Weight: {hint_weight})"
-        self.weights = weights
+        if new_hint != None:
+            if hint_weight != None:
+                self.hints += "\n" + "- " + str(new_hint) + f"(Weight: {hint_weight})"
+            else:
+                self.hints += "\n" + "- " + str(new_hint) + f"(Weight: 70)"
+
+        if weights != None:
+            self.weights = weights
         
     def _set_current_prompt(self, question):
         self.current_prompt = self.prompt + "\n When writing the code you should take the following weights in consideration, as to what you should focus more:\n"

@@ -27,8 +27,14 @@ class Reviewer():
         self.max_attempts = 10
 
     def update(self, new_hint, hint_weight, weights):
-        self.hints += "\n" + "- " + str(new_hint) + f"(Weight: {hint_weight})"
-        self.weights = weights
+        if new_hint != None:
+            if hint_weight != None:
+                self.hints += "\n" + "- " + str(new_hint) + f"(Weight: {hint_weight})"
+            else:
+                self.hints += "\n" + "- " + str(new_hint) + f"(Weight: 70)"
+
+        if weights != None:
+            self.weights = weights
         
     def _set_current_prompt(self, code):
         self.current_prompt = self.prompt + "\n The total score must be a weighted average of the other taking the following weights:"
