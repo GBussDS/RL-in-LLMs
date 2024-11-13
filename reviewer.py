@@ -7,7 +7,7 @@ client = Client(host='http://localhost:11434')
 
 class Reviewer():
 
-    def __init__(self):
+    def __init__(self, new=False):
         self.prompt = (
             "You are an expert code reviewer tasked with performing a comprehensive review. Your review should cover all critical aspects, "
             "including code clarity, readability, efficiency, and optimization, also check for proper use of imports and adherence to best practices. "
@@ -19,22 +19,17 @@ class Reviewer():
 
         
         self.current_prompt = ""
-        self.hints = ""
-        self.weights = {'clarity':1, 'readability':1, 'efficiency':1, 'optimization':1}
+        
+        if new:
+            self.hints = ""
+            self.weights = {'clarity':1, 'readability':1, 'efficiency':1, 'optimization':1}
+        else:
+            self.hints, self.weights = self._get_hints()
+
         self.prompt_history = []
         self.review_history = []
         self.reward_history = []
         self.max_attempts = 10
-
-    def update(self, new_hint, hint_weight, weights):
-        if new_hint != None:
-            if hint_weight != None:
-                self.hints += "\n" + "- " + str(new_hint) + f"(Weight: {hint_weight})"
-            else:
-                self.hints += "\n" + "- " + str(new_hint) + f"(Weight: 70)"
-
-        if weights != None:
-            self.weights = weights
         
     def _set_current_prompt(self, code):
         self.current_prompt = self.prompt + "\n The total score must be a weighted average of the other taking the following weights:"
@@ -80,6 +75,36 @@ class Reviewer():
         review = text[:score_match.start()].strip()
 
         return review, score
+
+    def update(self, new_hint, hint_weight, weights):
+        if new_hint != None:
+            if hint_weight != None:
+                self.hints += "\n" + "- " + str(new_hint) + f"(Weight: {hint_weight})"
+            else:
+                self.hints += "\n" + "- " + str(new_hint) + f"(Weight: 70)"
+
+        if weights != None:
+            self.weights = weights
+        
+        self._store_hints()
+    
+    def _store_hints(self):
+        text = str(self.weights) + self.hints
+        with open("data/programmer_hints.txt", "w") as file:
+            file.write(text)
+    
+    def _get_hints(self):
+        with open("data/programmer_hints.txt", "r") as file:
+            lines = file.readline()
+        
+        if len(lines) > 0:
+            hints = lines[0].strip()
+            weights = "".join(lines[1:]).strip()
+        else:
+            hints = ""
+            weights = {'clarity':1, 'readability':1, 'efficiency':1, 'optimization':1}
+
+        return hints, weights
 
 if __name__ == '__main__':
     
