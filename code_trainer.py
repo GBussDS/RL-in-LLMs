@@ -3,7 +3,7 @@ from programmer import Programmer
 from reviewer import Reviewer
 from prompt_master import PromptMaster
 
-class main():
+class CodeTrainer():
     def __init__(self, programmer:Programmer, reviewer:Reviewer, promptMaster:PromptMaster):
         self.programmer = programmer
         self.reviewer = reviewer
@@ -37,7 +37,7 @@ if __name__ == '__main__':
     reviewer = Reviewer()
     promptMaster = PromptMaster()
 
-    main = main(programmer, reviewer, promptMaster)
+    main = CodeTrainer(programmer, reviewer, promptMaster)
     
     main.train('Given an array of integers nums and an integer target,\
                 return indices of the two numbers such that they add up to target.\
