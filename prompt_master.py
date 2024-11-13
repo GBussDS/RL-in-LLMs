@@ -83,7 +83,6 @@ class PromptMaster():
         return hint, hint_strenght, weights
     
     def _extract_info(self, text):
-        print(text)
         important = re.findall(r"<(.*?)>", text)
 
         hint = important[0] if len(important) > 0 and important[0] else None
@@ -105,7 +104,7 @@ if __name__ == '__main__':
 
     review, score = reviewer.review(code)
 
-    hint, hint_stren, new_weight = promptMaster.create_hint('CODE', code, review, score, programmer.weights)
+    hint, hint_stren, new_weight = PromptMaster.create_hint('CODE', code, review, score, programmer.weights)
     
     print(hint)
     print(hint_stren)

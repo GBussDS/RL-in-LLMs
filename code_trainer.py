@@ -13,17 +13,18 @@ class CodeTrainer():
         for i in range(iterations):
             code = self.programmer.code(question)
             review, score = self.reviewer.review(code)
-            code_hint, code_hint_stren, new_code_weight = self.promptMaster.create_hint('CODE', code, review, score, programmer.weights)
+            code_hint, code_hint_stren, new_code_weight = self.promptMaster.create_hint('CODE', code, review, score, self.programmer.weights)
 
             self.programmer.update(code_hint, code_hint_stren, new_code_weight)
 
             code = self.programmer.code(question)
             review, score = self.reviewer.review(code)
-            print(score)
-            review_hint, review_hint_stren, new_review_weight = self.promptMaster.create_hint('REVIEW', code, review, score, programmer.weights)
+            
+            review_hint, review_hint_stren, new_review_weight = self.promptMaster.create_hint('REVIEW', code, review, score, self.reviewer.weights)
 
             self.programmer.update(review_hint, review_hint_stren, new_review_weight)
 
+            print(score)
 
     def test(self, question):
         code = self.programmer.code(question)
