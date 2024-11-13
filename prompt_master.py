@@ -1,12 +1,12 @@
 from ollama import Client
-from programmer import programmer
-from reviewer import reviewer
+from programmer import Programmer
+from reviewer import Reviewer
 import ast
 import re
 
 client = Client(host='http://localhost:11434')
 
-class promptMaster():
+class PromptMaster():
 
     def __init__(self):
         self.prompt = ("\nPay close attention to the first word of this prompt, as it will dictate your role and approach. If the prompt starts with 'CODE', "
@@ -94,9 +94,9 @@ class promptMaster():
 
 if __name__ == '__main__':
     
-    reviewer = reviewer()
-    programmer = programmer()
-    promptMaster = promptMaster()
+    reviewer = Reviewer()
+    programmer = Programmer()
+    promptMaster = PromptMaster()
 
     code = programmer.code('Given an array of integers nums and an integer target,\
                      return indices of the two numbers such that they add up to target.\

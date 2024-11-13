@@ -2,7 +2,7 @@ from ollama import Client
 
 client = Client(host='http://localhost:11434')
 
-class programmer():
+class Programmer():
 
     def __init__(self):
         self.prompt = ("You are a skilled programmer. Write only the code, without any additional text, "
@@ -50,7 +50,7 @@ class programmer():
 
 if __name__ == '__main__':
 
-    programmer = programmer()
+    programmer = Programmer()
     
     code = programmer.code('Given an array of integers nums and an integer target,\
                      return indices of the two numbers such that they add up to target.\

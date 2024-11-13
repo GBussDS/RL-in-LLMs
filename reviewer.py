@@ -1,11 +1,11 @@
 from ollama import Client
-from programmer import programmer
+from programmer import Programmer
 import ast
 import re
 
 client = Client(host='http://localhost:11434')
 
-class reviewer():
+class Reviewer():
 
     def __init__(self):
         self.prompt = (
@@ -77,8 +77,8 @@ class reviewer():
 
 if __name__ == '__main__':
     
-    reviewer = reviewer()
-    programmer = programmer()
+    reviewer = Reviewer()
+    programmer = Programmer()
 
     code = programmer.code('Given an array of integers nums and an integer target,\
                      return indices of the two numbers such that they add up to target.\

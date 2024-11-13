@@ -1,10 +1,10 @@
 from ollama import Client
-from programmer import programmer
-from reviewer import reviewer
-from prompt_master import promptMaster
+from programmer import Programmer
+from reviewer import Reviewer
+from prompt_master import PromptMaster
 
 class main():
-    def __init__(self, programmer:programmer, reviewer:reviewer, promptMaster:promptMaster):
+    def __init__(self, programmer:Programmer, reviewer:Reviewer, promptMaster:PromptMaster):
         self.programmer = programmer
         self.reviewer = reviewer
         self.promptMaster = promptMaster
@@ -33,9 +33,9 @@ class main():
 
 if __name__ == '__main__':
     
-    programmer = programmer()
-    reviewer = reviewer()
-    promptMaster = promptMaster()
+    programmer = Programmer()
+    reviewer = Reviewer()
+    promptMaster = PromptMaster()
 
     main = main(programmer, reviewer, promptMaster)
     
