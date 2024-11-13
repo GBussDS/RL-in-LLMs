@@ -26,8 +26,9 @@ class reviewer():
         self.reward_history = []
         self.max_attempts = 10
 
-    def add_hint(self, new_hint, hint_weight):
+    def update(self, new_hint, hint_weight, weights):
         self.hints += "\n" + "- " + str(new_hint) + f"(Weight: {hint_weight})"
+        self.weights = weights
         
     def _set_current_prompt(self, code):
         self.current_prompt = self.prompt + "\n The total score must be a weighted average of the other taking the following weights:"
@@ -64,13 +65,14 @@ class reviewer():
     
     def _extract_score(self, text):
         lines = text.strip().split('\n')
-        last_line = lines[-1]
-        score_text = re.search(r"\{.*\}", last_line).group()
+
+        score_match = re.search(r"\{.*\}", text)
+        score_text = score_match.group()
 
         score = ast.literal_eval(score_text)
 
-        review = '\n'.join(lines[:-1])
-        
+        review = text[:score_match.start()].strip()
+
         return review, score
 
 if __name__ == '__main__':

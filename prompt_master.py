@@ -16,18 +16,20 @@ class promptMaster():
                 "focusing on overall quality enhancements that will remain relevant across different versions and types of code. The hint should not reference any specific code content "
                 "but should offer guidance that could improve clarity, readability, efficiency, or optimization. Provide only the hint and an emphasis score, which is a single number "
                 "from 1 to 100, indicating how strongly the hint should be followed. Include the hint, the emphasis score, and the weights for each area in the following format, and "
-                "ensure that NOTHING follows this format (make sure to write between <>):\n"
+                "ensure that NOTHING follows this format (make sure to write between <>).\n"
+                "Make SURE the ONLY thing you answer is in the format, the <> brakets MUST be included in the answer three times:"
                 "Hint: <Your hint here>\n"
                 "Emphasis: <1-100>\n"
-                "{'clarity': weight, 'readability': weight, 'efficiency': weight, 'optimization': weight}"
+                "<{'clarity': weight, 'readability': weight, 'efficiency': weight, 'optimization': weight}> #python dictionarie format"
 
                 "\n\nREVIEW: You are an expert prompt master responsible for providing a general, long-lasting hint that will help the reviewer improve their feedback. "
                 "Your hint should be applicable to multiple rounds of review and focus on enhancing clarity, readability, efficiency, or optimization in their feedback, "
                 "without referencing any specific feedback or code instance. Provide only the hint and an emphasis score, which is a single number from 1 to 100, indicating how strongly "
-                "the hint should be prioritized in their next review. Include the hint, the emphasis score, and the weights in the following format, ensuring NOTHING follows this format:\n"
+                "the hint should be prioritized in their next review. Include the hint, the emphasis score, and the weights in the following format, ensuring NOTHING follows this format (make sure to write between <>):\n"
+                "Make SURE the ONLY thing you answer is in the format, the <> brakets MUST be included in the answer three times::"
                 "Hint: <Your hint here>\n"
                 "Emphasis: <1-100>\n"
-                "{'clarity': weight, 'readability': weight, 'efficiency': weight, 'optimization': weight}")
+                "<{'clarity': weight, 'readability': weight, 'efficiency': weight, 'optimization': weight}> #python dictionarie format")
 
 
         self.current_prompt = ""
@@ -81,15 +83,13 @@ class promptMaster():
         return hint, hint_strenght, weights
     
     def _extract_info(self, text):
-        lines = text.strip().split('\n')
+        print(text)
+        important = re.findall(r"<(.*?)>", text)
 
-        weights_text = re.search(r"\{.*\}", lines[-1]).group()
-        weights = ast.literal_eval(weights_text)
+        hint = important[0] if len(important) > 0 and important[0] else None
+        hint_strength = important[1] if len(important) > 1 and important[1] else None
+        weights = important[2] if len(important) > 2 and important[2] else None
 
-        hint_text = "\n".join(lines[:-2])
-        hint = re.search(r"<(.*?)>", hint_text).group(1)
-        hint_strength = re.search(r"<(.*?)>", lines[-2]).group(1)
-        
         return hint, hint_strength, weights
 
 if __name__ == '__main__':
@@ -108,4 +108,5 @@ if __name__ == '__main__':
     hint, hint_stren, new_weight = promptMaster.create_hint('CODE', code, review, score, programmer.weights)
     
     print(hint)
+    print(hint_stren)
     print(new_weight)

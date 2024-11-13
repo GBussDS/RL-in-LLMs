@@ -16,8 +16,9 @@ class programmer():
         self.max_attempts = 10
         self.weights = {'clarity':1, 'readability':1, 'efficiency':1, 'optimization':1}
 
-    def add_hint(self, new_hint, hint_weight):
+    def update(self, new_hint, hint_weight, weights):
         self.hints += "\n" + "- " + str(new_hint) + f"(Weight: {hint_weight})"
+        self.weights = weights
         
     def _set_current_prompt(self, question):
         self.current_prompt = self.prompt + "\n When writing the code you should take the following weights in consideration, as to what you should focus more:\n"
