@@ -34,7 +34,6 @@ class Environment():
         if ruff_issues > 0:
             score -= min(1.0, ruff_issues * 0.1)
 
-        # Step 4: Bandit security check
         bandit_result = subprocess.run(["bandit", "-r", "temp_code.py"], capture_output=True, text=True)
         bandit_issues = bandit_result.stdout.count("Issue")
         if bandit_issues > 0:
@@ -45,6 +44,38 @@ class Environment():
         final_score = score / max_score
 
         return final_score
+
+    def run_code(self, code: str):
+        code = re.sub(r"```python|```", "", code).strip()
+
+        temp_file_path = "temp_code.py"
+        
+        with open(temp_file_path, "w", encoding="utf-8") as temp_file:
+            temp_file.write(code)
+        
+        try:
+            result = subprocess.run(
+                ["python", temp_file_path],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                timeout=100
+            )
+            
+            if result.returncode == 0:
+                #Success
+                return True, result.stdout.strip()
+            else:
+                #Fail
+                return False, result.stderr.strip()
+        
+        except Exception as e:
+            return False, str(e)
+        
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
 
 
     def train(self, question, iterations):
