@@ -3,7 +3,7 @@ from programmer import Programmer
 from reviewer import Reviewer
 from prompt_master import PromptMaster
 
-class CodeTrainer():
+class Environment():
     def __init__(self, programmer:Programmer, reviewer:Reviewer, promptMaster:PromptMaster):
         self.programmer = programmer
         self.reviewer = reviewer
@@ -38,14 +38,14 @@ if __name__ == '__main__':
     reviewer = Reviewer()
     promptMaster = PromptMaster()
 
-    main = CodeTrainer(programmer, reviewer, promptMaster)
+    env = Environment(programmer, reviewer, promptMaster)
     
-    main.train('Given an array of integers nums and an integer target,\
+    env.train('Given an array of integers nums and an integer target,\
                 return indices of the two numbers such that they add up to target.\
                 You may assume that each input would have exactly one solution,\
                 and you may not use the same element twice. You can return the answer in any order.', 10)
     
-    main.test('Given an array of integers nums and an integer target,\
+    env.test('Given an array of integers nums and an integer target,\
                 return indices of the two numbers such that they add up to target.\
                 You may assume that each input would have exactly one solution,\
                 and you may not use the same element twice. You can return the answer in any order.')
