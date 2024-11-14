@@ -3,11 +3,49 @@ from programmer import Programmer
 from reviewer import Reviewer
 from prompt_master import PromptMaster
 
+import os
+import subprocess
+from typing import Optional
+import re
+
 class Environment():
-    def __init__(self, programmer:Programmer, reviewer:Reviewer, promptMaster:PromptMaster):
+    def __init__(self, programmer: Programmer, reviewer: Reviewer, promptMaster: PromptMaster):
         self.programmer = programmer
         self.reviewer = reviewer
         self.promptMaster = promptMaster
+
+    def eval_code(self, code: str):
+        code = re.sub(r"```python|```", "", code).strip()
+
+        with open("temp_code.py", "w") as temp_file:
+            temp_file.write(code)
+
+        max_score = 3
+        score = 3
+
+        #Mypy
+        mypy_result = subprocess.run(["mypy", "temp_code.py"], capture_output=True, text=True)
+        if "error" in mypy_result.stdout.lower():
+            score -= 1
+
+        #Ruff
+        ruff_result = subprocess.run(["ruff", "temp_code.py"], capture_output=True, text=True)
+        ruff_issues = ruff_result.stdout.count("E") + ruff_result.stdout.count("W")
+        if ruff_issues > 0:
+            score -= min(1.0, ruff_issues * 0.1)
+
+        # Step 4: Bandit security check
+        bandit_result = subprocess.run(["bandit", "-r", "temp_code.py"], capture_output=True, text=True)
+        bandit_issues = bandit_result.stdout.count("Issue")
+        if bandit_issues > 0:
+            score -= min(1.0, bandit_issues * 0.2)
+
+        os.remove("temp_code.py")
+
+        final_score = score / max_score
+
+        return final_score
+
 
     def train(self, question, iterations):
         for i in range(iterations):
