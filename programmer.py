@@ -1,4 +1,5 @@
 from ollama import Client
+import ast
 
 client = Client(host='http://localhost:11434')
 
@@ -68,14 +69,14 @@ class Programmer():
     
     def _get_hints(self):
         with open("data/programmer_hints.txt", "r") as file:
-            lines = file.readline()
+            lines = file.readlines()
         
-        if len(lines) > 0:
-            hints = lines[0].strip()
-            weights = "".join(lines[1:]).strip()
+        if lines:
+            weights = ast.literal_eval(lines[0].strip())
+            hints = "".join(lines[1:]).strip()
         else:
+            weights = {'clarity': 1, 'readability': 1, 'efficiency': 1, 'optimization': 1}
             hints = ""
-            weights = {'clarity':1, 'readability':1, 'efficiency':1, 'optimization':1}
 
         return hints, weights
 
