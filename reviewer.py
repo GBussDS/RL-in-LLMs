@@ -3,6 +3,8 @@
 from ollama import Client
 import ast
 import re
+import pickle
+import os
 import logging
 import random
 
@@ -10,6 +12,7 @@ client = Client(host='http://localhost:11434')
 
 class Reviewer:
     def __init__(self, prompt_master, epsilon=0.1):
+        self.q_table = {}
         self.review_prompt = (
             "Você é um revisor de código especialista em ciência de dados. Realize uma revisão abrangente do código fornecido, "
             "avaliando clareza, legibilidade, eficiência e otimização. Identifique erros, sugira melhorias e adicione comentários quando necessário. "
@@ -226,3 +229,21 @@ class Reviewer:
         self.review_history = []
         self.report_history = []
         self.reward_history = []
+    
+    def save(self, filepath):
+        """Salva o estado atual do agente Reviewer em um arquivo."""
+        with open(filepath, 'wb') as f:
+            pickle.dump(self, f)
+        logging.info(f"Revisor salvo em {filepath}")
+
+    @staticmethod
+    def load(filepath):
+        """Carrega o estado do agente Reviewer a partir de um arquivo."""
+        if os.path.exists(filepath):
+            with open(filepath, 'rb') as f:
+                reviewer = pickle.load(f)
+            logging.info(f"Revisor carregado de {filepath}")
+            return reviewer
+        else:
+            logging.warning(f"Arquivo {filepath} não encontrado. Inicializando um novo Revisor.")
+            return None

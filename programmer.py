@@ -5,11 +5,14 @@ import ast
 import re
 import logging
 import random
+import pickle
+import os
 
 client = Client(host='http://localhost:11434')
 
 class Programmer:
     def __init__(self, prompt_master, epsilon=0.1):
+        self.q_table = {}
         self.prompt = (
             "Você é um programador experiente em ciência de dados. Escreva apenas o código, sem texto adicional, "
             "rótulos de linguagem, cabeçalhos ou explicações. Você pode adicionar comentários para legibilidade. "
@@ -162,3 +165,21 @@ class Programmer:
         self.prompt_history = []
         self.code_history = []
         self.reward_history = []
+
+    def save(self, filepath):
+        """Salva o estado atual do agente Programmer em um arquivo."""
+        with open(filepath, 'wb') as f:
+            pickle.dump(self, f)
+        logging.info(f"Programador salvo em {filepath}")
+
+    @staticmethod
+    def load(filepath):
+        """Carrega o estado do agente Programmer a partir de um arquivo."""
+        if os.path.exists(filepath):
+            with open(filepath, 'rb') as f:
+                programmer = pickle.load(f)
+            logging.info(f"Programador carregado de {filepath}")
+            return programmer
+        else:
+            logging.warning(f"Arquivo {filepath} não encontrado. Inicializando um novo Programador.")
+            return None
