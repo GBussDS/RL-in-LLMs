@@ -85,6 +85,21 @@ class Reviewer:
         self.reward_history.append(score)
         return action, review, score
 
+    def extract_scores(self, text):
+        score_match = re.search(r"\{.*\}", text)
+        if score_match:
+            score_text = score_match.group()
+            try:
+                score = ast.literal_eval(score_text)
+            except Exception as e:
+                logging.error(f"Erro ao interpretar a pontuação: {e}")
+                score = {'Total': 0, 'clarity': 0, 'readability': 0, 'efficiency': 0, 'optimization': 0}
+            review = text[:score_match.start()].strip()
+            return review, score
+        else:
+            logging.error("Formato de pontuação inválido recebido.")
+            return text, {'Total': 0, 'clarity': 0, 'readability': 0, 'efficiency': 0, 'optimization': 0}
+
 
     def generate_review(self, prompt):
         attempts = 0
@@ -98,16 +113,6 @@ class Reviewer:
             ])
             attempts += 1
         return response
-
-    def extract_scores(self, text):
-        score_match = re.search(r"\{.*\}", text)
-        if score_match:
-            score_text = score_match.group()
-            score = ast.literal_eval(score_text)
-            review = text[:score_match.start()].strip()
-            return review, score
-        else:
-            return text, {'Total': 0, 'clarity': 0, 'readability': 0, 'efficiency': 0, 'optimization': 0}
 
     def act_report(self, code, training=True):
         # Implementação similar para gerar relatórios
