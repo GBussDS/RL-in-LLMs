@@ -1,8 +1,6 @@
 # prompt_master.py
 
 from ollama import Client
-from programmer import Programmer
-from reviewer import Reviewer
 import ast
 import re
 import random
@@ -10,71 +8,68 @@ import logging
 
 client = Client(host='http://localhost:11434')
 
-class PromptMaster():
-
+class PromptMaster:
     def __init__(self, epsilon=0.1):
         self.prompt = (
-            "\nPay close attention to the first word of this prompt, as it will dictate your role and approach. If the prompt starts with 'CODE', "
-            "you are guiding the programmer. If it starts with 'REVIEW', you are guiding the reviewer. Act according to the first word and follow the specific instructions below."
+            "\nPreste atenção na primeira palavra deste prompt, pois ela ditará seu papel e abordagem. Se o prompt começar com 'CODE', "
+            "você está guiando o programador. Se começar com 'REVIEW', você está guiando o revisor. Aja de acordo com a primeira palavra e siga as instruções específicas abaixo."
 
-            "\n\nCODE: You are an expert prompt master responsible for providing a general, long-lasting hint that will help the programmer iteratively improve their code, "
-            "focusing on overall quality enhancements that will remain relevant across different versions and types of code. The hint should not reference any specific code content "
-            "but should offer guidance that could improve clarity, readability, efficiency, or optimization. Provide only the hint and an emphasis score, which is a single number "
-            "from 1 to 100, indicating how strongly the hint should be followed. Include the hint, the emphasis score, and the weights for each area in the following format, and "
-            "ensure that NOTHING follows this format (make sure to write between <>).\n"
-            "Make SURE the ONLY thing you answer is in the format, the <> brackets MUST be included in the answer three times:"
-            "Hint: <Your hint here>\n"
-            "Emphasis: <1-100>\n"
-            "<{'clarity': weight, 'readability': weight, 'efficiency': weight, 'optimization': weight}> #python dictionary format"
+            "\n\nCODE: Você é um mestre de prompts responsável por fornecer uma dica geral e duradoura que ajudará o programador a melhorar iterativamente seu código, "
+            "focando em aprimoramentos de qualidade geral que permanecerão relevantes em diferentes versões e tipos de código. A dica não deve referenciar nenhum conteúdo específico do código "
+            "mas deve oferecer orientação que possa melhorar a clareza, legibilidade, eficiência ou otimização. Forneça apenas a dica e uma pontuação de ênfase, que é um único número "
+            "de 1 a 100, indicando quão fortemente a dica deve ser seguida. Inclua a dica, a pontuação de ênfase e os pesos para cada área no seguinte formato, e "
+            "certifique-se de que NADA siga este formato (garanta que os <> estejam incluídos na resposta três vezes):"
+            "Dica: <Sua dica aqui>\n"
+            "Ênfase: <1-100>\n"
+            "<{'clarity': weight, 'readability': weight, 'efficiency': weight, 'optimization': weight}> #formato de dicionário python"
 
-            "\n\nREVIEW: You are an expert prompt master responsible for providing a general, long-lasting hint that will help the reviewer improve their feedback. "
-            "Your hint should be applicable to multiple rounds of review and focus on enhancing clarity, readability, efficiency, or optimization in their feedback, "
-            "without referencing any specific feedback or code instance. Provide only the hint and an emphasis score, which is a single number from 1 to 100, indicating how strongly "
-            "the hint should be prioritized in their next review. Include the hint, the emphasis score, and the weights in the following format, ensuring NOTHING follows this format (make sure to write between <>):\n"
-            "Make SURE the ONLY thing you answer is in the format, the <> brackets MUST be included in the answer three times::"
-            "Hint: <Your hint here>\n"
-            "Emphasis: <1-100>\n"
-            "<{'clarity': weight, 'readability': weight, 'efficiency': weight, 'optimization': weight}> #python dictionary format"
+            "\n\nREVIEW: Você é um mestre de prompts responsável por fornecer uma dica geral e duradoura que ajudará o revisor a melhorar seu feedback. "
+            "Sua dica deve ser aplicável a múltiplas rodadas de revisão e focar em aprimorar a clareza, legibilidade, eficiência ou otimização no feedback, "
+            "sem referenciar nenhum feedback ou instância de código específico. Forneça apenas a dica e uma pontuação de ênfase, que é um único número de 1 a 100, indicando quão fortemente "
+            "a dica deve ser priorizada na próxima revisão. Inclua a dica, a pontuação de ênfase e os pesos no seguinte formato, garantindo que NADA siga este formato (garanta que os <> estejam incluídos na resposta três vezes):"
+            "Dica: <Sua dica aqui>\n"
+            "Ênfase: <1-100>\n"
+            "<{'clarity': weight, 'readability': weight, 'efficiency': weight, 'optimization': weight}> #formato de dicionário python"
         )
-
         self.current_prompt = ""
         self.programmer_weights_history = []
         self.reviewer_weights_history = []
         self.programmer_reward_history = []
         self.reviewer_reward_history = []
         self.max_attempts = 10
-        self.epsilon = epsilon  # Probability to explore new prompts
+        self.epsilon = epsilon  # Probabilidade de explorar novas dicas
 
-        # Initialize action-value tables
+        # Inicializar tabelas Q para ações
         self.action_values = {
             'CODE': {},
             'REVIEW': {}
         }
 
-        # Configure logging
+        # Configurar logging
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
     def _set_current_prompt(self, stage, code, review):
         self.current_prompt = stage + self.prompt
-        self.current_prompt += "\n\nThe code is:\n\n" + code
-        self.current_prompt += "\n\nThe review was:\n\n" + review
+        self.current_prompt += "\n\nO código é:\n\n" + code
+        self.current_prompt += "\n\nA revisão foi:\n\n" + review
 
-        self.current_prompt += "\n\nFor reference, these are the weights the " + stage + "R used and the subsequent score it achieved:" 
+        self.current_prompt += "\n\nPara referência, estes são os pesos que o " + stage + " usou e a pontuação subsequente que alcançou:" 
 
         if stage == 'CODE':
             for reward, weight in zip(self.programmer_reward_history, self.programmer_weights_history):
-                self.current_prompt += "\n" + "Score: "+ str(reward) + " Weights: " + str(weight)
+                self.current_prompt += "\n" + "Pontuação: "+ str(reward) + " Pesos: " + str(weight)
         elif stage == 'REVIEW':
             for reward, weight in zip(self.reviewer_reward_history, self.reviewer_weights_history):
-                self.current_prompt += "\n" + "Score: "+ str(reward) + " Weights: " + str(weight)
+                self.current_prompt += "\n" + "Pontuação: "+ str(reward) + " Pesos: " + str(weight)
 
     def select_action(self, stage):
-        """Select an action based on epsilon-greedy policy."""
+        """Seleciona uma ação baseada na política epsilon-greedy."""
+        state = self.get_state(stage)
         if random.random() < self.epsilon or not self.action_values[stage]:
-            # Explore: return a request for a new prompt
+            # Explorar: solicitar uma nova dica
             return 'NEW_PROMPT'
         else:
-            # Exploit: choose the prompt with the highest reward
+            # Explorar: escolher a dica com maior recompensa
             best_prompt = max(self.action_values[stage], key=self.action_values[stage].get)
             return best_prompt
 
@@ -88,6 +83,25 @@ class PromptMaster():
 
         self._set_current_prompt(stage, code, review)
 
+        response = self.generate_hint(stage)
+        hint, hint_strength, weights = self.extract_info(response['message']['content'])
+
+        if hint and hint_strength:
+            action = f"Dica: {hint}"
+            if action not in self.action_values[stage]:
+                self.action_values[stage][action] = 0
+            try:
+                self.action_values[stage][action] += float(hint_strength)
+                logging.info(f"Adicionado/Atualizado ação '{action}' com força {hint_strength} no estágio '{stage}'.")
+            except ValueError:
+                logging.error(f"Pontuação de força inválida '{hint_strength}' para a ação '{action}'. Deve ser um número.")
+
+        else:
+            logging.warning(f"Falha ao extrair dica ou força da resposta: {response['message']['content']}")
+
+        return hint, hint_strength, weights
+
+    def generate_hint(self, stage):
         attempts = 0
         response = {'done_reason': None}
         while response['done_reason'] != 'stop' and attempts < self.max_attempts:
@@ -98,48 +112,39 @@ class PromptMaster():
                 },
             ])
             attempts += 1
+        return response
 
-        hint, hint_strength, weights = self._extract_info(response['message']['content'])
-
-        if hint and hint_strength:
-            action = f"Hint: {hint}"
-            if action not in self.action_values[stage]:
-                self.action_values[stage][action] = 0
-            try:
-                self.action_values[stage][action] += float(hint_strength)
-                logging.info(f"Added/Updated action '{action}' with strength {hint_strength} in stage '{stage}'.")
-            except ValueError:
-                logging.error(f"Invalid hint_strength '{hint_strength}' for action '{action}'. Must be a number.")
-
-        else:
-            logging.warning(f"Failed to extract hint or hint_strength from response: {response['message']['content']}")
-
-        return hint, hint_strength, weights
-
-    def _extract_info(self, text):
+    def extract_info(self, text):
         important = re.findall(r"<(.*?)>", text)
-
         hint = important[0] if len(important) > 0 and important[0] else None
         hint_strength = important[1] if len(important) > 1 and important[1] else None
         weights = important[2] if len(important) > 2 and important[2] else None
-
         return hint, hint_strength, weights
 
     def evaluate_action(self, stage, action, reward):
-        """Update action-value based on the received reward."""
+        """Atualiza o valor da ação baseada na recompensa recebida."""
         if action != 'NEW_PROMPT':
             if action in self.action_values[stage]:
                 self.action_values[stage][action] += reward
-                logging.info(f"Updated action '{action}' in stage '{stage}' with reward {reward}. New value: {self.action_values[stage][action]}")
+                logging.info(f"Atualizado ação '{action}' no estágio '{stage}' com recompensa {reward}. Novo valor: {self.action_values[stage][action]}")
             else:
-                # Initialize the action with the reward if it doesn't exist
+                # Inicializa a ação com a recompensa se não existir
                 self.action_values[stage][action] = reward
-                logging.warning(f"Action '{action}' not found in stage '{stage}'. Initialized with reward {reward}.")
+                logging.warning(f"Ação '{action}' não encontrada no estágio '{stage}'. Inicializada com recompensa {reward}.")
+
+    def get_state(self, stage):
+        """Define o estado atual baseado na última recompensa."""
+        if stage == 'CODE':
+            return self.programmer_reward_history[-1] if self.programmer_reward_history else 0
+        elif stage == 'REVIEW':
+            return self.reviewer_reward_history[-1] if self.reviewer_reward_history else 0
+        return 0
 
     def reset_history(self):
-        """Reset histories after an episode."""
+        """Reseta os históricos após um episódio."""
         self.programmer_reward_history = []
         self.programmer_weights_history = []
         self.reviewer_reward_history = []
         self.reviewer_weights_history = []
-        logging.info("Reset all histories in PromptMaster.")
+        logging.info("Históricos do PromptMaster resetados.")
+

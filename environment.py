@@ -1,20 +1,18 @@
-from ollama import Client
 from programmer import Programmer
 from reviewer import Reviewer
 from prompt_master import PromptMaster
 
 import os
 import subprocess
-from typing import Optional
 import re
 import time
 import json
 
 class Environment():
-    def __init__(self, programmer: Programmer, reviewer: Reviewer, promptMaster: PromptMaster):
+    def __init__(self, programmer: Programmer, reviewer: Reviewer, prompt_master: PromptMaster):
         self.programmer = programmer
         self.reviewer = reviewer
-        self.promptMaster = promptMaster
+        self.prompt_master = prompt_master
 
     def eval_code(self, code: str):
         code = re.sub(r"```python|```", "", code).strip()
@@ -84,79 +82,78 @@ class Environment():
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
 
-    def train(self, question, iterations):
-        for i in range(iterations):
-            print(f"\n--- Iteration {i+1} ---")
+    def calculate_reward(self, code_score, report_score):
+        # Calcula a recompensa baseada na pontuação do código e do relatório
+        normalized_code_score = code_score  # Já está entre 0 e 1
+        normalized_report_score = report_score / 100  # Normaliza para [0,1]
+        total_reward = (normalized_code_score + normalized_report_score) / 2
+        return total_reward
 
-            # Generate code
-            code = self.programmer.code(question)
-            print(f"Generated Code:\n{code}")
+    def train(self, problem):
+        question = problem["question"]
+        data = problem["data"]
+        metrics = problem["metrics"]
 
-            # Run and evaluate code
-            success, exec_time, output = self.run_code(code)
-            score = self.eval_code(code)
-            print(f"Code Execution Success: {success}, Time: {exec_time}, Output: {output}")
-            print(f"Code Evaluation Score: {score}")
+        print(f"\n--- Treinando com o problema: {question} ---")
 
-            # Review code
-            review, review_score = self.reviewer.review(code)
-            print(f"Review:\n{review}")
-            print(f"Review Score: {review_score}")
+        # Passo 1: Agente Codificador gera o código
+        code = self.programmer.act(question)
+        print(f"Código Gerado:\n{code}")
 
-            # Generate report
-            report, report_score = self.reviewer.generate_report(code)
-            print(f"Report:\n{report}")
-            print(f"Report Score: {report_score}")
-
-            # Determine reward
-            if score > 0.9 and report_score > 90:
-                reward = 1  # High reward
-                print("Reward: +1 (Success)")
-            else:
-                reward = -1  # Penalty
-                print("Reward: -1 (Failure)")
-
-            # Generate and update hints based on reward
-
-            if reward > 0:
-                # For CODE stage
-                code_hint, code_hint_strength, new_code_weight = self.promptMaster.create_hint('CODE', code, review, score, self.programmer.weights)
-                self.programmer.update(code_hint, code_hint_strength, new_code_weight)
-                action_code = f"Hint: {code_hint}"
-                self.promptMaster.evaluate_action('CODE', action_code, reward)
-                print(f"Updated CODE Hint: {code_hint}")
-
-                # For REVIEW stage
-                review_hint, review_hint_strength, new_review_weight = self.promptMaster.create_hint('REVIEW', code, review, review_score, self.reviewer.weights)
-                self.reviewer.update(review_hint, review_hint_strength, new_review_weight)
-                action_review = f"Hint: {review_hint}"
-                self.promptMaster.evaluate_action('REVIEW', action_review, reward)
-                print(f"Updated REVIEW Hint: {review_hint}")
-            else:
-                # Handle penalties or negative feedback if necessary
-                print("No hint update due to failure.")
-
-            print(f"End of Iteration {i+1}")
-
-        # Reset histories after training
-        self.promptMaster.reset_history()
-
-
-    def test(self, question):
-        code = self.programmer.code(question)
+        # Passo 2: Executar e avaliar o código
         success, exec_time, output = self.run_code(code)
-        score = self.eval_code(code)
+        code_score = self.eval_code(code)
+        print(f"Execução do Código: {'Sucesso' if success else 'Falha'}, Tempo: {exec_time}, Output: {output}")
+        print(f"Pontuação do Código: {code_score}")
 
-        review, review_score = self.reviewer.review(code)
+        # Passo 3: Agente Revisor revisa o código
+        review, review_score = self.reviewer.act(code)
+        print(f"Revisão:\n{review}")
+        print(f"Pontuação da Revisão: {review_score}")
+
+        # Passo 4: Gerar e avaliar o relatório
         report, report_score = self.reviewer.generate_report(code)
+        print(f"Relatório:\n{report}")
+        print(f"Pontuação do Relatório: {report_score}")
 
-        print(f"Test Results:")
-        print(f"Success: {success}")
-        print(f"Execution Time: {exec_time}")
-        print(f"Output: {output}")
-        print(f"Code Score: {score}")
-        print(f"Review Score: {review_score}")
-        print(f"Report Score: {report_score}")
+        # Passo 5: Calcular recompensa
+        reward = self.calculate_reward(code_score, report_score)
+        print(f"Recompensa Calculada: {reward}")
+
+        # Passo 6: Atualizar políticas dos agentes com base na recompensa
+        self.programmer.update_policy(state=code_score, action=code, reward=reward)
+        self.reviewer.update_policy(state=review_score, action=review, reward=reward)
+
+    def test(self, problem):
+        question = problem["question"]
+        data = problem["data"]
+        metrics = problem["metrics"]
+
+        print(f"\n--- Testando com o problema: {question} ---")
+
+        # Passo 1: Agente Codificador gera o código
+        code = self.programmer.act(question, training=False)
+        print(f"Código Gerado:\n{code}")
+
+        # Passo 2: Executar e avaliar o código
+        success, exec_time, output = self.run_code(code)
+        code_score = self.eval_code(code)
+        print(f"Execução do Código: {'Sucesso' if success else 'Falha'}, Tempo: {exec_time}, Output: {output}")
+        print(f"Pontuação do Código: {code_score}")
+
+        # Passo 3: Agente Revisor revisa o código
+        review, review_score = self.reviewer.act(code, training=False)
+        print(f"Revisão:\n{review}")
+        print(f"Pontuação da Revisão: {review_score}")
+
+        # Passo 4: Gerar e avaliar o relatório
+        report, report_score = self.reviewer.generate_report(code)
+        print(f"Relatório:\n{report}")
+        print(f"Pontuação do Relatório: {report_score}")
+
+        # Passo 5: Calcular recompensa
+        reward = self.calculate_reward(code_score, report_score)
+        print(f"Recompensa Calculada: {reward}")
 
     def create_test_cases(self, question):
         """Create test cases based on the question."""
