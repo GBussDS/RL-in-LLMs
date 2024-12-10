@@ -9,7 +9,7 @@ import random
 client = Client(host='http://localhost:11434')
 
 class Reviewer:
-    def __init__(self, epsilon=0.1):
+    def __init__(self, prompt_master, epsilon=0.1):
         self.review_prompt = (
             "Você é um revisor de código especialista em ciência de dados. Realize uma revisão abrangente do código fornecido, "
             "avaliando clareza, legibilidade, eficiência e otimização. Identifique erros, sugira melhorias e adicione comentários quando necessário. "
@@ -33,6 +33,11 @@ class Reviewer:
         self.max_attempts = 10
         self.epsilon = epsilon  # Probabilidade de explorar ações
         self.q_table = {}  # Tabela Q para armazenar valores de ações
+        self.prompt_master = prompt_master  # Instância de PromptMaster
+
+        # Adicionando os atributos faltantes
+        self.reviewer_reward_history = []
+        self.reviewer_weights_history = []
 
     def _set_current_prompt(self, stage, code, review):
         self.current_prompt = stage + self.review_prompt
@@ -49,22 +54,34 @@ class Reviewer:
                 self.current_prompt += "\n" + "Pontuação: "+ str(reward) + " Pesos: " + str(weight)
 
     def act(self, code, training=True):
-        self._set_current_prompt('REVIEW', code, '')
-        state = self.get_state('REVIEW')
+        stage = 'REVIEW'
+        self._set_current_prompt(stage, code, '')
+        state = self.get_state(stage)
         
         # Seleção de ação baseada na política epsilon-greedy
         if training and random.random() < self.epsilon:
-            action = self.explore('REVIEW')
+            hint, hint_strength, weights = self.prompt_master.create_hint('REVIEW', code, '', self.get_last_score(), self.weights)
+            action = f"Dica: {hint}"
             logging.info(f"Revisor explorando com ação: {action}")
         else:
-            action = self.exploit('REVIEW', state)
+            action = self.exploit(stage, state)
             logging.info(f"Revisor explorando com ação: {action}")
+            hint, hint_strength, weights = self.prompt_master.extract_hint(action)
         
-        response = self.generate_review(action)
+        # Atualizar pesos se necessário
+        if weights:
+            self.weights = weights
+        
+        # Configurar o prompt com a dica
+        self._set_current_prompt(stage, code, hint)
+        
+        # Gerar a revisão com o prompt completo
+        response = self.generate_review(self.current_prompt)
         review, score = self.extract_scores(response['message']['content'])
         self.review_history.append(review)
         self.reward_history.append(score)
-        return review, score
+        return action, review, score
+
 
     def generate_review(self, prompt):
         attempts = 0
@@ -97,20 +114,25 @@ class Reviewer:
         return report, report_score
 
     def generate_report(self, code):
+        stage = 'REVIEW'
         self.current_prompt = self.report_prompt + "\n\n" + code
+        response = self.generate_report_prompt(self.current_prompt)
+        report, quality_score = self.extract_report_score(response['message']['content'])
+        self.report_history.append(report)
+        return report, quality_score
+
+    def generate_report_prompt(self, prompt):
         attempts = 0
         response = {'done_reason': None}
         while response['done_reason'] != 'stop' and attempts < self.max_attempts:
             response = client.chat(model='llama3.1', messages=[
                 {
                     'role': 'user',
-                    'content': self.current_prompt,
+                    'content': prompt,
                 },
             ])
             attempts += 1
-        report, quality_score = self.extract_report_score(response['message']['content'])
-        self.report_history.append(report)
-        return report, quality_score
+        return response
 
     def extract_report_score(self, text):
         score_match = re.search(r"\{.*\}", text)
@@ -130,11 +152,9 @@ class Reviewer:
             return self.reviewer_reward_history[-1] if self.reviewer_reward_history else 0
         return 0
 
-    def explore(self, stage):
+    def explore(self, stage, state):
         # Seleciona uma ação (prompt) aleatória
-        hint, hint_strength, weights = self.generate_hint()
-        action = f"Dica: {hint}"
-        return action
+        return self.prompt_master.get_random_action(stage)
 
     def exploit(self, stage, state):
         # Seleciona a melhor ação conhecida para o estado atual
@@ -142,7 +162,7 @@ class Reviewer:
             action = max(self.q_table[state], key=self.q_table[state].get)
             return action
         else:
-            return self.explore(stage)
+            return self.explore(stage, state)
 
     def generate_hint(self):
         # Implementação para gerar uma dica (hint) usando PromptMaster
@@ -170,6 +190,9 @@ class Reviewer:
         self.q_table[state][action] = new_q
 
         logging.info(f"Atualizado Q({state}, {action}) = {self.q_table[state][action]} com recompensa {reward}")
+
+    def get_last_score(self):
+        return self.reward_history[-1] if self.reward_history else 0
 
     def update(self, new_hint, hint_weight, weights):
         if new_hint:

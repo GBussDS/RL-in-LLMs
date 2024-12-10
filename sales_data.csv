@@ -1,0 +1,17 @@
+Date,Product,Category,Quantity,Unit_Price,Total_Revenue,Region
+2024-01-05,Smartphone,Eletrônicos,10,500,5000,Centro-Oeste
+2024-01-06,Laptop,Eletrônicos,5,1200,6000,Sudeste
+2024-01-07,Headphones,Acessórios,20,150,3000,Norte
+2024-01-08,Tablet,Eletrônicos,7,800,5600,Sul
+2024-01-09,Smartwatch,Acessórios,15,200,3000,Centro-Oeste
+2024-01-10,Câmera Fotográfica,Eletrônicos,3,1500,4500,Sudeste
+2024-01-11,Carregador,Acessórios,25,50,1250,Norte
+2024-01-12,Monitor,Eletrônicos,4,300,1200,Sul
+2024-01-13,Teclado,Acessórios,18,80,1440,Centro-Oeste
+2024-01-14,Mouse,Acessórios,22,60,1320,Sudeste
+2024-01-15,Impressora,Eletrônicos,2,700,1400,Norte
+2024-01-16,Pen Drive,Acessórios,30,40,1200,Sul
+2024-01-17,Router,Eletrônicos,6,250,1500,Centro-Oeste
+2024-01-18,Webcam,Acessórios,12,100,1200,Sudeste
+2024-01-19,HD Externo,Eletrônicos,5,400,2000,Norte
+2024-01-20,Bluetooth Speaker,Acessórios,14,120,1680,Sul

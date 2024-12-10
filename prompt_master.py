@@ -62,17 +62,6 @@ class PromptMaster:
             for reward, weight in zip(self.reviewer_reward_history, self.reviewer_weights_history):
                 self.current_prompt += "\n" + "Pontuação: "+ str(reward) + " Pesos: " + str(weight)
 
-    def select_action(self, stage):
-        """Seleciona uma ação baseada na política epsilon-greedy."""
-        state = self.get_state(stage)
-        if random.random() < self.epsilon or not self.action_values[stage]:
-            # Explorar: solicitar uma nova dica
-            return 'NEW_PROMPT'
-        else:
-            # Explorar: escolher a dica com maior recompensa
-            best_prompt = max(self.action_values[stage], key=self.action_values[stage].get)
-            return best_prompt
-
     def create_hint(self, stage, code, review, score, weights):
         if stage == 'CODE':
             self.programmer_reward_history.append(score)
@@ -121,6 +110,19 @@ class PromptMaster:
         weights = important[2] if len(important) > 2 and important[2] else None
         return hint, hint_strength, weights
 
+    def get_random_action(self, stage):
+        # Implementação para selecionar uma dica aleatória se necessário
+        return f"Dica: Sempre valide os dados antes de processá-los."
+
+    def extract_hint(self, action):
+        # Extrai a dica e a força da ação selecionada
+        match = re.match(r"Dica:\s*(.*?)", action)
+        if match:
+            hint = match.group(1)
+            # Assumindo que a força está armazenada na ação_values
+            return hint, 80, None # self.weights   # Placeholder: ajustar conforme necessário
+        return None, None, None
+
     def evaluate_action(self, stage, action, reward):
         """Atualiza o valor da ação baseada na recompensa recebida."""
         if action != 'NEW_PROMPT':
@@ -147,4 +149,3 @@ class PromptMaster:
         self.reviewer_reward_history = []
         self.reviewer_weights_history = []
         logging.info("Históricos do PromptMaster resetados.")
-

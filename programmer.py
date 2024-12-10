@@ -9,10 +9,12 @@ import random
 client = Client(host='http://localhost:11434')
 
 class Programmer:
-    def __init__(self, epsilon=0.1):
-        self.prompt = ("Você é um programador experiente em ciência de dados. Escreva apenas o código, sem texto adicional, "
-                      "rótulos de linguagem, cabeçalhos ou explicações. Você pode adicionar comentários para legibilidade. "
-                      "O código deve incluir todas as importações necessárias e ser executável como está. Se estiver criando uma função, forneça um exemplo de uso no final.")
+    def __init__(self, prompt_master, epsilon=0.1):
+        self.prompt = (
+            "Você é um programador experiente em ciência de dados. Escreva apenas o código, sem texto adicional, "
+            "rótulos de linguagem, cabeçalhos ou explicações. Você pode adicionar comentários para legibilidade. "
+            "O código deve incluir todas as importações necessárias e ser executável como está. Se estiver criando uma função, forneça um exemplo de uso no final."
+        )
         self.current_prompt = ""
         self.hints = ""
         self.weights = {'clarity':1, 'readability':1, 'efficiency':1, 'optimization':1}
@@ -22,29 +24,40 @@ class Programmer:
         self.max_attempts = 10
         self.epsilon = epsilon  # Probabilidade de explorar ações
         self.q_table = {}  # Tabela Q para armazenar valores de ações
+        self.prompt_master = prompt_master  # Instância de PromptMaster
+        self.programmer_reward_history = []
+        self.programmer_weights_history = []
 
-    def _set_current_prompt(self, question):
-        self.current_prompt = self.prompt + "\nConsidere os seguintes pesos ao escrever o código:\n"
-        self.current_prompt += str(self.weights)
-        self.current_prompt += "\nConsidere as seguintes dicas (hints), cada uma com um peso de 1 a 100, indicando sua importância. As dicas são:"
-        self.current_prompt += self.hints
-        self.current_prompt += "\nAgora, seguindo todas as regras anteriores, escreva um código para responder à seguinte questão:\n"
-        self.current_prompt += question
+    def _set_current_prompt(self, question, hint=None):
+        self.current_prompt = self.prompt + "\n\n"
+        self.current_prompt += f"Considere os seguintes pesos ao escrever o código:\n{self.weights}\n\n"
+        if hint:
+            self.current_prompt += f"Dica: {hint}\n\n"
+        self.current_prompt += f"Agora, seguindo todas as regras anteriores, escreva um código para responder à seguinte questão:\n{question}"
         self.prompt_history.append(self.current_prompt)
 
     def act(self, question, training=True):
-        self._set_current_prompt(question)
         state = self.get_state()
         
         # Seleção de ação baseada na política epsilon-greedy
         if training and random.random() < self.epsilon:
-            action = self.explore()
+            hint, hint_strength, weights = self.prompt_master.create_hint('CODE', '', '', self.get_last_score(), self.weights)
+            action = f"Dica: {hint}"
             logging.info(f"Programador explorando com ação: {action}")
         else:
             action = self.exploit(state)
             logging.info(f"Programador explorando com ação: {action}")
+            hint, hint_strength, weights = self.prompt_master.extract_hint(action)
         
-        response = self.generate_code(action)
+        # Atualizar pesos se necessário
+        if weights:
+            self.weights = weights
+        
+        # Configurar o prompt com a dica
+        self._set_current_prompt(question, hint)
+        
+        # Gerar o código com o prompt completo
+        response = self.generate_code(self.current_prompt)
         code = response['message']['content']
         self.code_history.append(code)
         return code
@@ -52,15 +65,24 @@ class Programmer:
     def generate_code(self, prompt):
         attempts = 0
         response = {'done_reason': None}
-        while response['done_reason'] != 'stop' and attempts < self.max_attempts:
+        full_code = ""
+        while attempts < self.max_attempts:
             response = client.chat(model='llama3.1', messages=[
                 {
                     'role': 'user',
                     'content': prompt,
                 },
             ])
+            content = response['message']['content']
+            if '...' in content:
+                full_code += content.replace('...', '')
+                prompt += "\nPor favor, complete o código acima."
+            else:
+                full_code += content
+                break
             attempts += 1
-        return response
+        return {'message': {'content': full_code}}
+
 
     def get_state(self):
         # Define o estado como a pontuação atual do código (0-1)
@@ -70,11 +92,14 @@ class Programmer:
         return last_score
 
     def explore(self):
-        # Seleciona uma ação (prompt) aleatória
-        # Neste contexto, a ação é o prompt master para gerar dicas
-        hint, hint_strength, weights = self.generate_hint()
-        action = f"Dica: {hint}"
-        return action
+        # Seleciona uma ação (prompt) aleatória da tabela Q
+        if not self.q_table:
+            return self.prompt_master.get_random_action('CODE')
+        state = self.get_state()
+        if state in self.q_table and self.q_table[state]:
+            return max(self.q_table[state], key=self.q_table[state].get)
+        else:
+            return self.prompt_master.get_random_action('CODE')
 
     def exploit(self, state):
         # Seleciona a melhor ação conhecida para o estado atual
@@ -83,14 +108,6 @@ class Programmer:
             return action
         else:
             return self.explore()
-
-    def generate_hint(self):
-        # Implementação para gerar uma dica (hint) usando PromptMaster
-        # Placeholder: substitua com chamada real
-        hint = "Melhore a legibilidade do código adicionando comentários explicativos."
-        hint_strength = 80
-        weights = self.weights
-        return hint, hint_strength, weights
 
     def update_policy(self, state, action, reward):
         # Atualiza a tabela Q usando a fórmula Q(s,a) = Q(s,a) + alpha * (reward + gamma * max(Q(s',a')) - Q(s,a))
@@ -110,6 +127,9 @@ class Programmer:
         self.q_table[state][action] = new_q
 
         logging.info(f"Atualizado Q({state}, {action}) = {self.q_table[state][action]} com recompensa {reward}")
+
+    def get_last_score(self):
+        return self.reward_history[-1] if self.reward_history else 0
 
     def update(self, new_hint, hint_weight, weights):
         if new_hint:

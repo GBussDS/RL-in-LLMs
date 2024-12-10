@@ -7,8 +7,9 @@ import subprocess
 import re
 import time
 import json
+import logging
 
-class Environment():
+class Environment:
     def __init__(self, programmer: Programmer, reviewer: Reviewer, prompt_master: PromptMaster):
         self.programmer = programmer
         self.reviewer = reviewer
@@ -42,9 +43,21 @@ class Environment():
 
         os.remove("temp_code.py")
 
-        final_score = score / max_score
-
-        return final_score
+        try:
+            with open("temp_code.py", "w") as temp_file:
+                temp_file.write(code)
+            subprocess.check_output(["python", "temp_code.py"], stderr=subprocess.STDOUT)
+            score = 1.0
+        except subprocess.CalledProcessError as e:
+            logging.error(f"Erro na execução do código: {e.output}")
+            score = 0.0
+        except Exception as e:
+            logging.error(f"Erro inesperado durante a avaliação do código: {e}")
+            score = 0.0
+        finally:
+            if os.path.exists("temp_code.py"):
+                os.remove("temp_code.py")
+        return score
 
     def run_code(self, code: str):
         code = re.sub(r"```python|```", "", code).strip()
@@ -76,7 +89,7 @@ class Environment():
                 return False, execution_time, result.stderr.strip()
 
         except Exception as e:
-            return False, str(e)
+            return False, 0, str(e)
 
         finally:
             if os.path.exists(temp_file_path):
@@ -94,66 +107,67 @@ class Environment():
         data = problem["data"]
         metrics = problem["metrics"]
 
-        print(f"\n--- Treinando com o problema: {question} ---")
+        logging.info(f"\n--- Treinando com o problema: {question} ---")
 
         # Passo 1: Agente Codificador gera o código
-        code = self.programmer.act(question)
-        print(f"Código Gerado:\n{code}")
+        code = self.programmer.act(question, training=True)
+        logging.info(f"Código Gerado:\n{code}")
 
         # Passo 2: Executar e avaliar o código
         success, exec_time, output = self.run_code(code)
         code_score = self.eval_code(code)
-        print(f"Execução do Código: {'Sucesso' if success else 'Falha'}, Tempo: {exec_time}, Output: {output}")
-        print(f"Pontuação do Código: {code_score}")
+        logging.info(f"Execução do Código: {'Sucesso' if success else 'Falha'}, Tempo: {exec_time}, Output: {output}")
+        logging.info(f"Pontuação do Código: {code_score}")
 
         # Passo 3: Agente Revisor revisa o código
-        review, review_score = self.reviewer.act(code)
-        print(f"Revisão:\n{review}")
-        print(f"Pontuação da Revisão: {review_score}")
+        action, review, review_score = self.reviewer.act(code, training=True)
+        logging.info(f"Revisão:\n{review}")
+        logging.info(f"Pontuação da Revisão: {review_score}")
 
         # Passo 4: Gerar e avaliar o relatório
         report, report_score = self.reviewer.generate_report(code)
-        print(f"Relatório:\n{report}")
-        print(f"Pontuação do Relatório: {report_score}")
+        logging.info(f"Relatório:\n{report}")
+        logging.info(f"Pontuação do Relatório: {report_score}")
 
         # Passo 5: Calcular recompensa
         reward = self.calculate_reward(code_score, report_score)
-        print(f"Recompensa Calculada: {reward}")
+        logging.info(f"Recompensa Calculada: {reward}")
 
         # Passo 6: Atualizar políticas dos agentes com base na recompensa
-        self.programmer.update_policy(state=code_score, action=code, reward=reward)
-        self.reviewer.update_policy(state=review_score, action=review, reward=reward)
+        self.programmer.update_policy(state=self.programmer.get_state(), action=code, reward=reward)
+        self.reviewer.update_policy(state=self.reviewer.get_state(stage='REVIEW'), action=action, reward=reward)
+
 
     def test(self, problem):
         question = problem["question"]
         data = problem["data"]
         metrics = problem["metrics"]
 
-        print(f"\n--- Testando com o problema: {question} ---")
+        logging.info(f"\n--- Testando com o problema: {question} ---")
 
         # Passo 1: Agente Codificador gera o código
         code = self.programmer.act(question, training=False)
-        print(f"Código Gerado:\n{code}")
+        logging.info(f"Código Gerado:\n{code}")
 
         # Passo 2: Executar e avaliar o código
         success, exec_time, output = self.run_code(code)
         code_score = self.eval_code(code)
-        print(f"Execução do Código: {'Sucesso' if success else 'Falha'}, Tempo: {exec_time}, Output: {output}")
-        print(f"Pontuação do Código: {code_score}")
+        logging.info(f"Execução do Código: {'Sucesso' if success else 'Falha'}, Tempo: {exec_time}, Output: {output}")
+        logging.info(f"Pontuação do Código: {code_score}")
 
         # Passo 3: Agente Revisor revisa o código
         review, review_score = self.reviewer.act(code, training=False)
-        print(f"Revisão:\n{review}")
-        print(f"Pontuação da Revisão: {review_score}")
+        logging.info(f"Revisão:\n{review}")
+        logging.info(f"Pontuação da Revisão: {review_score}")
 
         # Passo 4: Gerar e avaliar o relatório
         report, report_score = self.reviewer.generate_report(code)
-        print(f"Relatório:\n{report}")
-        print(f"Pontuação do Relatório: {report_score}")
+        logging.info(f"Relatório:\n{report}")
+        logging.info(f"Pontuação do Relatório: {report_score}")
 
         # Passo 5: Calcular recompensa
         reward = self.calculate_reward(code_score, report_score)
-        print(f"Recompensa Calculada: {reward}")
+        logging.info(f"Recompensa Calculada: {reward}")
 
     def create_test_cases(self, question):
         """Create test cases based on the question."""
