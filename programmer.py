@@ -1,5 +1,9 @@
+# programmer.py
+
 from ollama import Client
 import ast
+import re
+import logging
 
 client = Client(host='http://localhost:11434')
 
@@ -21,7 +25,7 @@ class Programmer():
         self.code_history = []
         self.reward_history = []
         self.max_attempts = 10
-        
+
     def _set_current_prompt(self, question):
         self.current_prompt = self.prompt + "\n When writing the code you should take the following weights in consideration, as to what you should focus more:\n"
         self.current_prompt += str(self.weights)
@@ -34,7 +38,7 @@ class Programmer():
         self._set_current_prompt(question)
        
         attempts = 0
-        response ={'done_reason':None}
+        response = {'done_reason':None}
         while response['done_reason'] != 'stop' and attempts < self.max_attempts:
             response = client.chat(model='llama3.1', messages=[
                 {
@@ -51,30 +55,37 @@ class Programmer():
         return code
     
     def update(self, new_hint, hint_weight, weights):
-        if new_hint != None:
-            if hint_weight != None:
-                self.hints += "\n" + "- " + str(new_hint) + f"(Weight: {hint_weight})"
+        if new_hint is not None:
+            if hint_weight is not None:
+                self.hints += "\n- " + str(new_hint) + f" (Weight: {hint_weight})"
             else:
-                self.hints += "\n" + "- " + str(new_hint) + f"(Weight: 70)"
+                self.hints += "\n- " + str(new_hint) + f" (Weight: 70)"
 
-        if weights != None:
+        if weights is not None:
             self.weights = weights
         
         self._store_hints()
 
     def _store_hints(self):
-        text = str(self.weights) + self.hints
+        # Ensure weights and hints are separated by a newline
+        text = str(self.weights) + "\n" + self.hints
         with open("data/programmer_hints.txt", "w") as file:
             file.write(text)
-    
+        logging.info("Stored programmer hints and weights.")
+
     def _get_hints(self):
-        with open("data/programmer_hints.txt", "r") as file:
-            lines = file.readlines()
-        
-        if lines:
-            weights = ast.literal_eval(lines[0].strip())
-            hints = "".join(lines[1:]).strip()
-        else:
+        try:
+            with open("data/programmer_hints.txt", "r") as file:
+                lines = file.readlines()
+            
+            if lines:
+                weights = ast.literal_eval(lines[0].strip())
+                hints = "".join(lines[1:]).strip()
+            else:
+                weights = {'clarity': 1, 'readability': 1, 'efficiency': 1, 'optimization': 1}
+                hints = ""
+        except (SyntaxError, ValueError, FileNotFoundError) as e:
+            logging.error(f"Error parsing programmer hints: {e}")
             weights = {'clarity': 1, 'readability': 1, 'efficiency': 1, 'optimization': 1}
             hints = ""
 
@@ -92,6 +103,3 @@ if __name__ == '__main__':
     print(code)
 
     print(programmer.current_prompt)
-
-
-

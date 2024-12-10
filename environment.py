@@ -7,6 +7,8 @@ import os
 import subprocess
 from typing import Optional
 import re
+import time
+import json
 
 class Environment():
     def __init__(self, programmer: Programmer, reviewer: Reviewer, promptMaster: PromptMaster):
@@ -23,17 +25,18 @@ class Environment():
         max_score = 3
         score = 3
 
-        #Mypy
+        # Mypy
         mypy_result = subprocess.run(["mypy", "temp_code.py"], capture_output=True, text=True)
         if "error" in mypy_result.stdout.lower():
             score -= 1
 
-        #Ruff
+        # Ruff
         ruff_result = subprocess.run(["ruff", "temp_code.py"], capture_output=True, text=True)
         ruff_issues = ruff_result.stdout.count("E") + ruff_result.stdout.count("W")
         if ruff_issues > 0:
             score -= min(1.0, ruff_issues * 0.1)
 
+        # Bandit
         bandit_result = subprocess.run(["bandit", "-r", "temp_code.py"], capture_output=True, text=True)
         bandit_issues = bandit_result.stdout.count("Issue")
         if bandit_issues > 0:
@@ -49,11 +52,13 @@ class Environment():
         code = re.sub(r"```python|```", "", code).strip()
 
         temp_file_path = "temp_code.py"
-        
+
         with open(temp_file_path, "w", encoding="utf-8") as temp_file:
             temp_file.write(code)
-        
+
         try:
+            start_time = time.time()
+
             result = subprocess.run(
                 ["python", temp_file_path],
                 capture_output=True,
@@ -61,61 +66,174 @@ class Environment():
                 encoding="utf-8",
                 timeout=100
             )
-            
+
+            end_time = time.time()
+            execution_time = end_time - start_time
+
             if result.returncode == 0:
-                #Success
-                return True, result.stdout.strip()
+                # Success
+                return True, execution_time, result.stdout.strip()
             else:
-                #Fail
-                return False, result.stderr.strip()
-        
+                # Fail
+                return False, execution_time, result.stderr.strip()
+
         except Exception as e:
             return False, str(e)
-        
+
         finally:
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
 
-
-
     def train(self, question, iterations):
         for i in range(iterations):
+            print(f"\n--- Iteration {i+1} ---")
+
+            # Generate code
             code = self.programmer.code(question)
-            review, score = self.reviewer.review(code)
-            code_hint, code_hint_stren, new_code_weight = self.promptMaster.create_hint('CODE', code, review, score, self.programmer.weights)
+            print(f"Generated Code:\n{code}")
 
-            self.programmer.update(code_hint, code_hint_stren, new_code_weight)
+            # Run and evaluate code
+            success, exec_time, output = self.run_code(code)
+            score = self.eval_code(code)
+            print(f"Code Execution Success: {success}, Time: {exec_time}, Output: {output}")
+            print(f"Code Evaluation Score: {score}")
 
-            code = self.programmer.code(question)
-            review, score = self.reviewer.review(code)
-            
-            review_hint, review_hint_stren, new_review_weight = self.promptMaster.create_hint('REVIEW', code, review, score, self.reviewer.weights)
+            # Review code
+            review, review_score = self.reviewer.review(code)
+            print(f"Review:\n{review}")
+            print(f"Review Score: {review_score}")
 
-            self.reviewer.update(review_hint, review_hint_stren, new_review_weight)
+            # Generate report
+            report, report_score = self.reviewer.generate_report(code)
+            print(f"Report:\n{report}")
+            print(f"Report Score: {report_score}")
 
-            print(score)
+            # Determine reward
+            if score > 0.9 and report_score > 90:
+                reward = 1  # High reward
+                print("Reward: +1 (Success)")
+            else:
+                reward = -1  # Penalty
+                print("Reward: -1 (Failure)")
+
+            # Generate and update hints based on reward
+
+            if reward > 0:
+                # For CODE stage
+                code_hint, code_hint_strength, new_code_weight = self.promptMaster.create_hint('CODE', code, review, score, self.programmer.weights)
+                self.programmer.update(code_hint, code_hint_strength, new_code_weight)
+                action_code = f"Hint: {code_hint}"
+                self.promptMaster.evaluate_action('CODE', action_code, reward)
+                print(f"Updated CODE Hint: {code_hint}")
+
+                # For REVIEW stage
+                review_hint, review_hint_strength, new_review_weight = self.promptMaster.create_hint('REVIEW', code, review, review_score, self.reviewer.weights)
+                self.reviewer.update(review_hint, review_hint_strength, new_review_weight)
+                action_review = f"Hint: {review_hint}"
+                self.promptMaster.evaluate_action('REVIEW', action_review, reward)
+                print(f"Updated REVIEW Hint: {review_hint}")
+            else:
+                # Handle penalties or negative feedback if necessary
+                print("No hint update due to failure.")
+
+            print(f"End of Iteration {i+1}")
+
+        # Reset histories after training
+        self.promptMaster.reset_history()
+
 
     def test(self, question):
         code = self.programmer.code(question)
-        review, score = self.reviewer.review(code)
+        success, exec_time, output = self.run_code(code)
+        score = self.eval_code(code)
 
-        print(f"With the score of {score} the code written was:\n\n{code}")
+        review, review_score = self.reviewer.review(code)
+        report, report_score = self.reviewer.generate_report(code)
+
+        print(f"Test Results:")
+        print(f"Success: {success}")
+        print(f"Execution Time: {exec_time}")
+        print(f"Output: {output}")
+        print(f"Code Score: {score}")
+        print(f"Review Score: {review_score}")
+        print(f"Report Score: {report_score}")
+
+    def create_test_cases(self, question):
+        """Create test cases based on the question."""
+        # This function should generate test inputs and expected outputs (gabarito)
+        # For demonstration, we'll define them manually
+        if "two numbers such that they add up to target" in question.lower():
+            test_cases = [
+                {
+                    "nums": [2, 7, 11, 15],
+                    "target": 9,
+                    "expected": [0, 1]
+                },
+                {
+                    "nums": [3, 2, 4],
+                    "target": 6,
+                    "expected": [1, 2]
+                },
+                {
+                    "nums": [3, 3],
+                    "target": 6,
+                    "expected": [0, 1]
+                }
+            ]
+            return test_cases
+        # Add more problem types as needed
+        else:
+            return []
+
+    def evaluate_tests(self, code: str, test_cases: list):
+        """Evaluate the code against the test cases."""
+        # Save the code to a temporary file
+        code = re.sub(r"```python|```", "", code).strip()
+        temp_file_path = "temp_code.py"
+
+        with open(temp_file_path, "w", encoding="utf-8") as temp_file:
+            temp_file.write(code)
+
+        all_passed = True
+        for test in test_cases:
+            nums = test['nums']
+            target = test['target']
+            expected = test['expected']
+
+            try:
+                result = subprocess.run(
+                    ["python", temp_file_path],
+                    input=json.dumps({"nums": nums, "target": target}),
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                if result.returncode != 0:
+                    all_passed = False
+                    break
+                output = json.loads(result.stdout)
+                if sorted(output) != sorted(expected):
+                    all_passed = False
+                    break
+            except Exception as e:
+                all_passed = False
+                break
+
+        os.remove(temp_file_path)
+        return all_passed
 
 if __name__ == '__main__':
-    
+
     programmer = Programmer()
     reviewer = Reviewer()
     promptMaster = PromptMaster()
 
     env = Environment(programmer, reviewer, promptMaster)
-    
-    env.train('Given an array of integers nums and an integer target,\
+
+    question = 'Given an array of integers nums and an integer target,\
                 return indices of the two numbers such that they add up to target.\
                 You may assume that each input would have exactly one solution,\
-                and you may not use the same element twice. You can return the answer in any order.', 10)
-    
-    env.test('Given an array of integers nums and an integer target,\
-                return indices of the two numbers such that they add up to target.\
-                You may assume that each input would have exactly one solution,\
-                and you may not use the same element twice. You can return the answer in any order.')
-    
+                and you may not use the same element twice. You can return the answer in any order.'
+
+    env.train(question, 10)
+    env.test(question)
