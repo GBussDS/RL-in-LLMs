@@ -103,12 +103,38 @@ class PromptMaster:
             attempts += 1
         return response
 
+    def safe_extract_data_structure(self, model_output, fallback_value=None):
+        if fallback_value is None:
+            fallback_value = {}
+
+        text = model_output.strip()
+
+        # Remove suspicious characters that could break parsing
+        suspicious_chars = ['`', '“', '”', '¨', '´']
+        for ch in suspicious_chars:
+            text = text.replace(ch, '')
+
+        # Attempt literal_eval
+        try:
+            return ast.literal_eval(text)
+        except Exception as e:
+            logging.warning(f"Failed to parse model output '{model_output}': {e}")
+            return fallback_value
+
     def extract_info(self, text):
         important = re.findall(r"<(.*?)>", text)
         hint = important[0] if len(important) > 0 and important[0] else None
         hint_strength = important[1] if len(important) > 1 and important[1] else None
-        weights = important[2] if len(important) > 2 and important[2] else None
-        return hint, hint_strength, weights
+        raw_weights = important[2] if len(important) > 2 and important[2] else None
+
+        # If raw_weights is not None, try to parse it
+        if raw_weights:
+            parsed_weights = self.safe_extract_data_structure(raw_weights, fallback_value={'clarity':1, 'readability':1, 'efficiency':1, 'optimization':1})
+        else:
+            parsed_weights = {'clarity':1, 'readability':1, 'efficiency':1, 'optimization':1}
+
+        return hint, hint_strength, parsed_weights
+
 
     def get_random_action(self, stage):
         # Implementação para selecionar uma dica aleatória se necessário

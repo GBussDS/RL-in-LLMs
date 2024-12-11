@@ -183,3 +183,12 @@ class Programmer:
         else:
             logging.warning(f"Arquivo {filepath} não encontrado. Inicializando um novo Programador.")
             return None
+    
+    def get_average_q_value(self):
+        values = []
+        for state_actions in self.q_table.values():
+            values.extend(state_actions.values())
+        if values:
+            return sum(values)/len(values)
+        else:
+            return 0.0

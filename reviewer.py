@@ -14,11 +14,15 @@ class Reviewer:
     def __init__(self, prompt_master, epsilon=0.1):
         self.q_table = {}
         self.review_prompt = (
-            "Você é um revisor de código especialista em ciência de dados. Realize uma revisão abrangente do código fornecido, "
-            "avaliando clareza, legibilidade, eficiência e otimização. Identifique erros, sugira melhorias e adicione comentários quando necessário. "
-            "No FINAL da sua revisão, forneça uma pontuação total de 1 a 100, bem como pontuações individuais para clareza, legibilidade, eficiência e otimização, no seguinte formato:\n"
-            "{'Total': score, 'clarity': score, 'readability': score, 'efficiency': score, 'optimization': score}"
+            "Você é um revisor de código altamente especializado em ciência de dados. Seu papel é sempre produzir uma avaliação abrangente do código fornecido, sem jamais recusar a tarefa. "
+            "Sua revisão deve abordar aspectos de clareza, legibilidade, eficiência e otimização. Você deve identificar erros, sugerir melhorias e adicionar comentários quando necessário. "
+            "Nunca responda com \"Não posso criar uma avaliação\" ou algo similar; você deve sempre fornecer a revisão pedida. "
+            "No FINAL da sua revisão, forneça uma pontuação total de 1 a 100, além de pontuações individuais para clareza, legibilidade, eficiência e otimização, no seguinte formato:\n"
+            "{'Total': score_total, 'clarity': score_clarity, 'readability': score_readability, 'efficiency': score_efficiency, 'optimization': score_optimization}\n"
+            "Certifique-se de que o dicionário seja válido e parseável, e que as chaves e valores estejam corretos. "
+            "Lembre-se: você sempre deve produzir a revisão e a pontuação, mesmo que o código tenha problemas graves."
         )
+
         self.report_prompt = (
             "Você é um analista de dados especialista encarregado de criar um relatório analítico abrangente com base no código fornecido. "
             "O relatório deve incluir etapas de limpeza de dados, transformações aplicadas, insights derivados e quaisquer visualizações geradas. "
@@ -89,17 +93,12 @@ class Reviewer:
         score_match = re.search(r"\{.*\}", text)
         if score_match:
             score_text = score_match.group()
-            try:
-                score = ast.literal_eval(score_text)
-            except Exception as e:
-                logging.error(f"Erro ao interpretar a pontuação: {e}")
-                score = {'Total': 0, 'clarity': 0, 'readability': 0, 'efficiency': 0, 'optimization': 0}
+            score = self.safe_extract_data_structure(score_text, fallback_value={'Total': 0, 'clarity': 0, 'readability': 0, 'efficiency': 0, 'optimization': 0})
             review = text[:score_match.start()].strip()
             return review, score
         else:
             logging.error("Formato de pontuação inválido recebido.")
             return text, {'Total': 0, 'clarity': 0, 'readability': 0, 'efficiency': 0, 'optimization': 0}
-
 
     def generate_review(self, prompt):
         attempts = 0
@@ -141,16 +140,39 @@ class Reviewer:
             ])
             attempts += 1
         return response
+    
+    def safe_extract_data_structure(self, model_output, fallback_value=None):
+        if fallback_value is None:
+            fallback_value = {}
+
+        text = model_output.strip()
+
+        # Remove suspicious characters that could break parsing
+        suspicious_chars = ['`', '“', '”', '¨', '´']
+        for ch in suspicious_chars:
+            text = text.replace(ch, '')
+
+        # Attempt literal_eval
+        try:
+            return ast.literal_eval(text)
+        except Exception as e:
+            logging.warning(f"Failed to parse model output '{model_output}': {e}")
+            return fallback_value
+
 
     def extract_report_score(self, text):
         score_match = re.search(r"\{.*\}", text)
         if score_match:
             score_text = score_match.group()
-            score = ast.literal_eval(score_text)
+            score = self.safe_extract_data_structure(score_text, fallback_value={'Report Quality': 0})
             report = text[:score_match.start()].strip()
-            return report, score['Report Quality']
+            # Ensure 'Report Quality' key exists
+            rq = score.get('Report Quality', 0)
+            return report, rq
         else:
+            logging.error("Formato de pontuação inválido para o relatório.")
             return text, 0
+
 
     def get_state(self, stage):
         """Define o estado atual baseado na última recompensa."""
@@ -252,3 +274,12 @@ class Reviewer:
         else:
             logging.warning(f"Arquivo {filepath} não encontrado. Inicializando um novo Revisor.")
             return None
+
+    def get_average_q_value(self):
+        values = []
+        for state_actions in self.q_table.values():
+            values.extend(state_actions.values())
+        if values:
+            return sum(values)/len(values)
+        else:
+            return 0.0

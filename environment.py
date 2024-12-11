@@ -2,6 +2,7 @@ from programmer import Programmer
 from reviewer import Reviewer
 from prompt_master import PromptMaster
 
+import matplotlib.pyplot as plt
 import os
 import subprocess
 import re
@@ -14,6 +15,11 @@ class Environment:
         self.programmer = programmer
         self.reviewer = reviewer
         self.prompt_master = prompt_master
+        self.code_scores = []
+        self.report_scores = []
+        self.programmer_q_values_history = []
+        self.reviewer_q_values_history = []
+
 
     def eval_code(self, code: str):
         code = re.sub(r"```python|```", "", code).strip()
@@ -137,6 +143,11 @@ class Environment:
         self.programmer.update_policy(state=self.programmer.get_state(), action=code, reward=reward)
         self.reviewer.update_policy(state=self.reviewer.get_state(stage='REVIEW'), action=action, reward=reward)
 
+        # Armazenar valores para plotagem
+        self.code_scores.append(code_score)
+        self.report_scores.append(report_score)
+        self.programmer_q_values_history.append(self.programmer.get_average_q_value())
+        self.reviewer_q_values_history.append(self.reviewer.get_average_q_value())
 
     def test(self, problem):
         question = problem["question"]
@@ -156,7 +167,8 @@ class Environment:
         logging.info(f"Pontuação do Código: {code_score}")
 
         # Passo 3: Agente Revisor revisa o código
-        review, review_score = self.reviewer.act(code, training=False)
+        # Aqui precisamos obter (action, review, review_score) mesmo no teste
+        action, review, review_score = self.reviewer.act(code, training=False)
         logging.info(f"Revisão:\n{review}")
         logging.info(f"Pontuação da Revisão: {review_score}")
 
@@ -165,9 +177,63 @@ class Environment:
         logging.info(f"Relatório:\n{report}")
         logging.info(f"Pontuação do Relatório: {report_score}")
 
-        # Passo 5: Calcular recompensa
+        # Calcular recompensa (poderíamos não precisar nessa fase, mas mantemos)
         reward = self.calculate_reward(code_score, report_score)
         logging.info(f"Recompensa Calculada: {reward}")
+
+        # Armazenar os valores atuais nas listas de histórico
+        self.code_scores.append(code_score)
+        self.report_scores.append(report_score)
+        self.programmer_q_values_history.append(self.programmer.get_average_q_value())
+        self.reviewer_q_values_history.append(self.reviewer.get_average_q_value())
+
+        # Após o teste, gerar gráficos
+        self.plot_results()
+
+    def plot_results(self):
+        # Gera gráficos a partir das listas code_scores, report_scores, programmer_q_values_history e reviewer_q_values_history
+
+        # 1. Gráfico de pontuação do código ao longo do tempo
+        plt.figure(figsize=(10,6))
+        plt.plot(self.code_scores, label='Pontuação do Código')
+        plt.xlabel('Iterações')
+        plt.ylabel('Pontuação do Código (0 a 1)')
+        plt.title('Evolução da Pontuação do Código')
+        plt.legend()
+        plt.savefig('evolucao_codigo.png')
+        plt.close()
+
+        # 2. Gráfico de pontuação do relatório ao longo do tempo
+        plt.figure(figsize=(10,6))
+        plt.plot(self.report_scores, label='Pontuação do Relatório')
+        plt.xlabel('Iterações')
+        plt.ylabel('Pontuação do Relatório (0 a 100)')
+        plt.title('Evolução da Pontuação do Relatório')
+        plt.legend()
+        plt.savefig('evolucao_relatorio.png')
+        plt.close()
+
+        # 3. Gráfico da média da Q-table do Programmer
+        plt.figure(figsize=(10,6))
+        plt.plot(self.programmer_q_values_history, label='Média Q-table Programmer')
+        plt.xlabel('Iterações')
+        plt.ylabel('Média Q-table')
+        plt.title('Evolução da Média da Q-table do Programmer')
+        plt.legend()
+        plt.savefig('evolucao_q_programmer.png')
+        plt.close()
+
+        # 4. Gráfico da média da Q-table do Reviewer
+        plt.figure(figsize=(10,6))
+        plt.plot(self.reviewer_q_values_history, label='Média Q-table Reviewer')
+        plt.xlabel('Iterações')
+        plt.ylabel('Média Q-table')
+        plt.title('Evolução da Média da Q-table do Reviewer')
+        plt.legend()
+        plt.savefig('evolucao_q_reviewer.png')
+        plt.close()
+
+        logging.info("Gráficos salvos: evolucao_codigo.png, evolucao_relatorio.png, evolucao_q_programmer.png, evolucao_q_reviewer.png")
 
     def create_test_cases(self, question):
         """Create test cases based on the question."""
